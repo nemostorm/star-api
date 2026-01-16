@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Moon, Sun, Save, Trash2, Copy, Play } from "lucide-react";
+import Footer from "@/components/Footer";
 
 interface ApiResponse {
   status: number;
@@ -226,7 +227,7 @@ export default function Home() {
 
   return (
     <motion.div 
-      className="min-h-screen relative" 
+      className="min-h-screen relative flex flex-col" 
       style={{ backgroundImage: 'url(/stars.avif)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
       initial="hidden"
       animate="visible"
@@ -234,9 +235,10 @@ export default function Home() {
     >
       <div className="absolute inset-0 z-0 dark:hidden" style={{ backgroundImage: 'url(/stars.avif)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', filter: 'invert(1)' }}></div>
       <div className="absolute inset-0 z-[1] bg-white/90 dark:bg-neutral-900/97"></div>
-      <motion.div className="relative z-10">
+      <motion.div className="relative z-10 flex flex-col flex-1">
+        <main className="flex-1">
         <motion.header 
-          className="border-b"
+          className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
           variants={cardVariants}
         >
           <div className="container mx-auto px-4 py-4 flex items-center justify-between max-w-6xl">
@@ -483,6 +485,8 @@ export default function Home() {
           </AnimatePresence>
 
         </motion.div>
+        </main>
+        <Footer />
       </motion.div>
     </motion.div>
   );
