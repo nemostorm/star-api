@@ -3,11 +3,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    serverComponentsExternalPackages: ["webpack"],
-    // Force Webpack in dev
-    forceWebPack: true,
-  },
+  // serverExternalPackages replaces experimental.serverComponentsExternalPackages
+  serverExternalPackages: ["webpack"],
+  // removed unsupported experimental.forceWebPack (invalid next.config option)
 };
 
 export default nextConfig;
