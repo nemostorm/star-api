@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Moon, Sun, Save, Trash2, Copy, Play } from "lucide-react";
+import { Moon, Sun, Save, Trash2, Copy, Play, Settings } from "lucide-react";
 import Footer from "@/components/Footer";
 
 interface ApiResponse {
@@ -55,17 +55,38 @@ function ThemeToggle() {
 }
 
 export default function Home() {
+  const { theme } = useTheme();
   // ...removed modal state...
   // State for endpoint name input
   const [endpointName, setEndpointName] = useState("");
   // Notification state
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Headers and presets
+  const [headers, setHeaders] = useState<Record<string, string>>({ "Content-Type": "application/json" });
+  const headerPresets: Record<string, Record<string, string>> = {
+    JSON: { "Content-Type": "application/json" },
+    Form: { "Content-Type": "application/x-www-form-urlencoded" },
+    "Auth: Bearer": { "Authorization": "Bearer <token>" },
+  };
+  const [selectedHeaderPreset, setSelectedHeaderPreset] = useState<string | null>(null);
+  const [headersRaw, setHeadersRaw] = useState<string>(JSON.stringify(headers, null, 2));
+
+  // Request history
+  const [requestHistory, setRequestHistory] = useState<Array<any>>([]);
+
+  // Response pretty print toggle
+  const [prettyPrint, setPrettyPrint] = useState(true);
+
+  // Settings
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [quickDeleteEnabled, setQuickDeleteEnabled] = useState(false);
+
   // State for confirm delete modal
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-  // Close delete modal on Escape key
+  // Close modals on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -73,11 +94,20 @@ export default function Home() {
           setIsConfirmModalOpen(false);
           setConfirmDeleteId(null);
         }
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isConfirmModalOpen]);
+  }, [isConfirmModalOpen, isSettingsOpen]);
+  
+
+  // keep raw headers synced
+  useEffect(() => {
+    setHeadersRaw(JSON.stringify(headers, null, 2));
+  }, [headers]);
 
         // Show notification for a short time
         const showNotification = (msg: string) => {
@@ -103,10 +133,30 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [method, setMethod] = useState("GET");
   const [body, setBody] = useState("");
+  // Search state for saved endpoints
+  const [endpointSearch, setEndpointSearch] = useState("");
   const [savedEndpoints, setSavedEndpoints] = useState<SavedEndpoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState<ApiResponse | null>(null);
+
+  // Keyboard shortcuts: Cmd/Ctrl+Enter to send, Cmd/Ctrl+S to save
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (mod && e.key === 'Enter') {
+        e.preventDefault();
+        if (url) sendRequest();
+      }
+      if (mod && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (url) saveEndpoint();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [url, method, body, headers]);
 
   // Animation variants
   const containerVariants = {
@@ -205,6 +255,8 @@ export default function Home() {
         headers: Object.fromEntries(res.headers.entries()),
         data: parsedData,
       });
+      // push to history
+      setRequestHistory(prev => [{ id: Math.random().toString(36).slice(2), url: endpoint.url, method: endpoint.method, body: endpoint.body, headers }, ...prev].slice(0, 20));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -219,9 +271,32 @@ export default function Home() {
     showNotification("URL copied to clipboard!");
   };
 
+  const buildCurl = ({ url, method, headers, body }: { url: string; method: string; headers?: Record<string,string>; body?: string; }) => {
+    const parts = ["curl"];
+    parts.push("-X");
+    parts.push(method);
+    if (headers) {
+      for (const k of Object.keys(headers)) {
+        const v = headers[k];
+        parts.push(`-H "${k}: ${v}"`);
+      }
+    }
+    if (body && body.trim()) {
+      parts.push(`--data '${body.replace(/'/g, "'\\''")}'`);
+    }
+    parts.push(`"${url}"`);
+    return parts.join(" ");
+  };
+
 
   // Show confirm modal instead of deleting immediately
   const requestDeleteEndpoint = (id: string) => {
+    if (quickDeleteEnabled) {
+      // perform delete immediately
+      setSavedEndpoints(prev => prev.filter(ep => ep.id !== id));
+      showNotification("Endpoint deleted");
+      return;
+    }
     setConfirmDeleteId(id);
     setIsConfirmModalOpen(true);
   };
@@ -247,11 +322,10 @@ export default function Home() {
     setResponse(null);
 
     try {
+      // add keyboard shortcut handler elsewhere; ensure headers are valid
       const options: RequestInit = {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: headers as Record<string, string>,
       };
 
       if (method !== "GET" && method !== "HEAD" && body) {
@@ -274,6 +348,8 @@ export default function Home() {
         headers: Object.fromEntries(res.headers.entries()),
         data: parsedData,
       });
+      // push to history
+      setRequestHistory(prev => [{ id: Math.random().toString(36).slice(2), url, method, body, headers }, ...prev].slice(0, 20));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -306,7 +382,22 @@ export default function Home() {
             >
               StarAPI
             </motion.h1>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsSettingsOpen(true)}
+                    title="Settings"
+                  >
+                    <Settings className="h-[1.2rem] w-[1.2rem]" />
+                    <span className="sr-only">Open settings</span>
+                  </Button>
+                </div>
+              </motion.div>
+              <ThemeToggle />
+            </div>
           </div>
         </motion.header>
 
@@ -342,13 +433,36 @@ export default function Home() {
                     onChange={(e) => setUrl(e.target.value)}
                     className="flex-1"
                   />
+                  <div className="w-48">
+                    <select
+                      value={selectedHeaderPreset || ""}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        setSelectedHeaderPreset(key || null);
+                        if (key && headerPresets[key]) setHeaders(headerPresets[key]);
+                      }}
+                      className="w-full rounded border px-2 py-1 bg-transparent"
+                    >
+                      <option value="">Header Preset</option>
+                      {Object.keys(headerPresets).map((k) => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <Button onClick={sendRequest} disabled={loading || !url}>
+                    <Button variant="outline" onClick={sendRequest} disabled={loading || !url}>
                       {loading ? "Sending..." : "Send"}
                     </Button>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button variant="outline" onClick={() => {
+                      const curl = buildCurl({ url, method, headers, body });
+                      navigator.clipboard.writeText(curl);
+                      showNotification("cURL copied to clipboard!");
+                    }}>Copy as cURL</Button>
                   </motion.div>
                   <motion.div
                     whileHover={{ scale: 1.05 }}
@@ -370,6 +484,23 @@ export default function Home() {
                       onChange={(e) => setBody(e.target.value)}
                       rows={6}
                     />
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium mb-2">Headers (JSON)</label>
+                      <Textarea
+                        placeholder='{"Content-Type":"application/json"}'
+                        value={headersRaw}
+                        onChange={(e) => {
+                          setHeadersRaw(e.target.value);
+                          try {
+                            const parsed = JSON.parse(e.target.value);
+                            setHeaders(parsed);
+                          } catch (err) {
+                            // ignore parse errors until valid
+                          }
+                        }}
+                        rows={4}
+                      />
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -393,6 +524,38 @@ export default function Home() {
             )}
           </AnimatePresence>
 
+          {/* Request History */}
+          {requestHistory.length > 0 && (
+            <motion.div variants={cardVariants} initial="hidden" animate="visible">
+              <Card className="mt-6 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-white/20">
+                <CardHeader>
+                  <CardTitle>Request History</CardTitle>
+                  <CardDescription>Recent requests (click to load or run)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {requestHistory.map((h) => (
+                      <div key={h.id} className="flex items-center justify-between p-2 border rounded">
+                        <div className="flex-1">
+                          <button className="text-left w-full" onClick={() => { setUrl(h.url); setMethod(h.method); setBody(h.body || ""); setHeaders(h.headers || {}); }}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono">{h.method}</span>
+                              <span className="text-sm truncate">{h.url}</span>
+                            </div>
+                          </button>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => runEndpoint(h)}>Run</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(buildCurl({ url: h.url, method: h.method, headers: h.headers, body: h.body })); showNotification('cURL copied'); }}>cURL</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
           <AnimatePresence>
             {response && (
               <motion.div
@@ -415,15 +578,22 @@ export default function Home() {
                         <TabsTrigger value="headers">Headers</TabsTrigger>
                       </TabsList>
                       <TabsContent value="body" className="mt-4">
+                        <div className="flex items-center justify-end mb-2 gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setPrettyPrint(p => !p)}>{prettyPrint ? 'Raw' : 'Pretty'}</Button>
+                        </div>
                         <motion.pre 
-                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96"
+                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96 whitespace-pre-wrap"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.2 }}
                         >
-                          {typeof response.data === "string"
-                            ? response.data
-                            : JSON.stringify(response.data, null, 2)}
+                          {(() => {
+                            const d = response.data;
+                            if (prettyPrint) {
+                              try { return typeof d === 'string' ? JSON.stringify(JSON.parse(d), null, 2) : JSON.stringify(d, null, 2); } catch { return typeof d === 'string' ? d : JSON.stringify(d, null, 2); }
+                            }
+                            return typeof d === 'string' ? d : JSON.stringify(d);
+                          })()}
                         </motion.pre>
                       </TabsContent>
                       <TabsContent value="headers" className="mt-4">
@@ -455,6 +625,42 @@ export default function Home() {
                   <CardHeader>
                     <CardTitle>Saved Endpoints</CardTitle>
                     <CardDescription>Your saved API endpoints</CardDescription>
+                    <div className="mt-3 w-full max-w-lg flex items-center gap-2">
+                      <Input
+                        placeholder="Search endpoints by name or URL..."
+                        value={endpointSearch}
+                        onChange={(e) => setEndpointSearch(e.target.value)}
+                      />
+                      <Button size="sm" variant="outline" onClick={() => {
+                        // export
+                        const data = JSON.stringify(savedEndpoints, null, 2);
+                        const blob = new Blob([data], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'saved_endpoints.json';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}>Export</Button>
+                      <label className="cursor-pointer">
+                        <input type="file" accept="application/json" className="hidden" onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            try {
+                              const parsed = JSON.parse(String(reader.result));
+                              if (Array.isArray(parsed)) setSavedEndpoints(parsed);
+                              showNotification('Imported endpoints');
+                            } catch (err) {
+                              showNotification('Import failed');
+                            }
+                          };
+                          reader.readAsText(f);
+                        }} />
+                        <Button size="sm">Import</Button>
+                      </label>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <motion.div 
@@ -464,40 +670,47 @@ export default function Home() {
                       animate="visible"
                     >
                       <AnimatePresence>
-                        {savedEndpoints.map((endpoint, index) => (
-                          <motion.div 
+                        {savedEndpoints
+                          .filter(ep => {
+                            const q = endpointSearch.trim().toLowerCase();
+                            if (!q) return true;
+                            return ep.url.toLowerCase().includes(q) || ep.name.toLowerCase().includes(q);
+                          })
+                          .map((endpoint, index) => (
+                          <div 
                             key={endpoint.id} 
-                            className="flex items-center justify-between p-3 border rounded-lg backdrop-blur-sm bg-white/5 dark:bg-black/10 border-white/10"
-                            variants={cardVariants}
-                            layout
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ delay: index * 0.1 }}
-                            whileHover={{ scale: 1.02 }}
+                            className="relative flex items-center justify-between p-3 border rounded-lg backdrop-blur-sm bg-white/5 dark:bg-black/10 border-white/10"
                           >
+                            {quickDeleteEnabled && (
+                              <button
+                                onClick={() => requestDeleteEndpoint(endpoint.id)}
+                                aria-label="Delete endpoint"
+                                title="Delete endpoint"
+                                className={
+                                  `absolute -top-2 -right-2 w-5 h-5 rounded-full text-[10px] leading-none flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 ` +
+                                  (theme === "dark"
+                                    ? "bg-white text-black"
+                                    : "bg-black text-white")
+                                }
+                              >
+                                ×
+                              </button>
+                            )}
                             <div className="flex-1">
-                              <motion.button
+                              <button
                                 onClick={() => loadEndpoint(endpoint)}
-                                className="text-left hover:text-blue-600 dark:hover:text-blue-400 w-full"
-                                whileHover={{ x: 5 }}
-                                transition={{ type: "spring", stiffness: 400 }}
+                                className="text-left w-full"
                               >
                                 <div className="flex items-center gap-2">
-                                  <span
-                                    className="rounded-sm px-2 py-1 text-xs font-mono"
-                                    style={{ background: getEndpointColor(endpoint.method), color: "#fff" }}
-                                  >
-                                    {endpoint.method}
-                                  </span>
-                                  <span
-                                    className="rounded-sm px-2 py-1 text-xs font-mono"
-                                    style={{ background: getEndpointColor(endpoint.method), color: "#fff" }}
-                                  >
-                                    {endpoint.url}
-                                  </span>
+                                            <span
+                                              className="rounded-sm px-2 py-1 text-xs font-mono"
+                                              style={{ background: getEndpointColor(endpoint.method), color: "#fff" }}
+                                            >
+                                              {endpoint.method}
+                                            </span>
+                                            <span className="ml-2 text-sm truncate">{endpoint.url}</span>
                                 </div>
-                              </motion.button>
+                              </button>
                             </div>
                             <div className="flex items-center">
                               <DropdownMenu>
@@ -515,7 +728,14 @@ export default function Home() {
                                     Run
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => copyEndpoint(endpoint)}>
-                                    Copy
+                                    Copy URL
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    const curl = buildCurl({ url: endpoint.url, method: endpoint.method, body: endpoint.body, headers });
+                                    navigator.clipboard.writeText(curl);
+                                    showNotification('cURL copied to clipboard!');
+                                  }}>
+                                    Copy as cURL
                                   </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => requestDeleteEndpoint(endpoint.id)} className="text-red-600">
                                     Delete
@@ -523,7 +743,7 @@ export default function Home() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
-                          </motion.div>
+                          </div>
                         ))}
                       </AnimatePresence>
                     </motion.div>
@@ -544,6 +764,28 @@ export default function Home() {
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={handleCancelDelete}>Cancel</Button>
                 <Button variant="destructive" onClick={handleConfirmDelete}>Delete</Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Settings Modal */}
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white dark:bg-neutral-900 rounded-lg p-6 w-full max-w-md shadow-lg">
+              <h2 className="text-lg font-semibold mb-4">Settings</h2>
+              <div className="space-y-4">
+                <label className="flex items-center justify-between">
+                  <span>Quick delete (no confirmation)</span>
+                  <input
+                    type="checkbox"
+                    checked={quickDeleteEnabled}
+                    onChange={(e) => setQuickDeleteEnabled(e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>Close</Button>
+                </div>
               </div>
             </div>
           </div>
