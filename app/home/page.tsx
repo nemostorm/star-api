@@ -370,7 +370,7 @@ export default function Home() {
       <motion.div className="relative z-10 flex flex-col flex-1">
         <main className="flex-1">
         <motion.header 
-          className="border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
+          className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
           variants={cardVariants}
         >
           <div className="container mx-auto px-4 py-4 flex items-center justify-between max-w-6xl">
@@ -482,6 +482,7 @@ export default function Home() {
                       placeholder="Enter JSON body"
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
+                      className="font-mono"
                       rows={6}
                     />
                     <div className="mt-3">
@@ -499,6 +500,7 @@ export default function Home() {
                           }
                         }}
                         rows={4}
+                        className="font-mono"
                       />
                     </div>
                   </div>
@@ -524,37 +526,7 @@ export default function Home() {
             )}
           </AnimatePresence>
 
-          {/* Request History */}
-          {requestHistory.length > 0 && (
-            <motion.div variants={cardVariants} initial="hidden" animate="visible">
-              <Card className="mt-6 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-white/20">
-                <CardHeader>
-                  <CardTitle>Request History</CardTitle>
-                  <CardDescription>Recent requests (click to load or run)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {requestHistory.map((h) => (
-                      <div key={h.id} className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex-1">
-                          <button className="text-left w-full" onClick={() => { setUrl(h.url); setMethod(h.method); setBody(h.body || ""); setHeaders(h.headers || {}); }}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono">{h.method}</span>
-                              <span className="text-sm truncate">{h.url}</span>
-                            </div>
-                          </button>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="ghost" onClick={() => runEndpoint(h)}>Run</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(buildCurl({ url: h.url, method: h.method, headers: h.headers, body: h.body })); showNotification('cURL copied'); }}>cURL</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+          
 
           <AnimatePresence>
             {response && (
@@ -582,7 +554,7 @@ export default function Home() {
                           <Button size="sm" variant="outline" onClick={() => setPrettyPrint(p => !p)}>{prettyPrint ? 'Raw' : 'Pretty'}</Button>
                         </div>
                         <motion.pre 
-                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96 whitespace-pre-wrap"
+                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96 whitespace-pre-wrap font-mono"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.2 }}
@@ -598,7 +570,7 @@ export default function Home() {
                       </TabsContent>
                       <TabsContent value="headers" className="mt-4">
                         <motion.pre 
-                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96"
+                          className="bg-white dark:bg-neutral-900 p-4 rounded overflow-auto max-h-96 font-mono"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: 0.2 }}
@@ -755,6 +727,38 @@ export default function Home() {
 
         </motion.div>
         </main>
+        {/* Request History */}
+        {requestHistory.length > 0 && (
+          <motion.div className="container mx-auto p-4 max-w-6xl" variants={cardVariants} initial="hidden" animate="visible">
+            <Card className="mt-6 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-white/20">
+              <CardHeader>
+                <CardTitle>Request History</CardTitle>
+                <CardDescription>Recent requests (click to load or run)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className={requestHistory.length > 5 ? "space-y-2 max-h-60 overflow-y-auto pr-2" : "space-y-2"}>
+                  {requestHistory.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex-1">
+                        <button className="text-left w-full" onClick={() => { setUrl(h.url); setMethod(h.method); setBody(h.body || ""); setHeaders(h.headers || {}); }}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono">{h.method}</span>
+                            <span className="text-sm truncate">{h.url}</span>
+                          </div>
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => runEndpoint(h)}>Run</Button>
+                        <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(buildCurl({ url: h.url, method: h.method, headers: h.headers, body: h.body })); showNotification('cURL copied'); }}>cURL</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Confirm Delete Modal */}
         {isConfirmModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
