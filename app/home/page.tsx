@@ -81,6 +81,9 @@ export default function Home() {
   // Settings
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [quickDeleteEnabled, setQuickDeleteEnabled] = useState(false);
+  // Save modal state (optional name input when saving an endpoint)
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [saveModalName, setSaveModalName] = useState("");
 
   // State for confirm delete modal
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
