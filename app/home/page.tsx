@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -144,6 +144,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState<ApiResponse | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   // Keyboard shortcuts: Cmd/Ctrl+Enter to send, Cmd/Ctrl+S to save
   useEffect(() => {
@@ -619,8 +620,12 @@ export default function Home() {
                         a.click();
                         URL.revokeObjectURL(url);
                       }}>Export</Button>
-                      <label className="cursor-pointer">
-                        <input type="file" accept="application/json" className="hidden" onChange={(e) => {
+                      <input
+                        ref={importInputRef}
+                        type="file"
+                        accept="application/json"
+                        className="hidden"
+                        onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
                           const reader = new FileReader();
@@ -634,14 +639,14 @@ export default function Home() {
                             }
                           };
                           reader.readAsText(f);
-                        }} />
-                        <Button size="sm">Import</Button>
-                      </label>
+                        }}
+                      />
+                      <Button size="sm" onClick={() => importInputRef.current?.click()}>Import</Button>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <motion.div 
-                      className="space-y-2"
+                      className={savedEndpoints.length > 10 ? "space-y-2 max-h-96 overflow-y-auto pr-2" : "space-y-2"}
                       variants={containerVariants}
                       initial="hidden"
                       animate="visible"
@@ -748,7 +753,7 @@ export default function Home() {
               {requestHistory.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">No recent requests</div>
               ) : (
-                <div className={requestHistory.length > 5 ? "space-y-2 max-h-60 overflow-y-auto pr-2" : "space-y-2"}>
+                <div className={requestHistory.length > 5 ? "space-y-2 max-h-96 overflow-y-auto pr-2" : "space-y-2"}>
                   {requestHistory.map((h) => (
                     <div key={h.id} className="flex items-center justify-between p-2 border rounded">
                       <div className="flex-1">
