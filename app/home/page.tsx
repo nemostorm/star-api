@@ -214,11 +214,11 @@ export default function Home() {
       url,
       method,
       body,
-      name: saveModalName.trim() || url
+      name: endpointName.trim() || url
     };
     setSavedEndpoints(prev => [...prev, newEndpoint]);
     setIsSaveModalOpen(false);
-    setSaveModalName("");
+    setEndpointName("");
   };
 
   const handleCancelSave = () => {
