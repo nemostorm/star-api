@@ -85,6 +85,8 @@ export default function Home() {
   // State for confirm delete modal
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  // Clear history confirmation modal
+  const [isClearHistoryModalOpen, setIsClearHistoryModalOpen] = useState(false);
 
   // Close modals on Escape key
   useEffect(() => {
@@ -94,6 +96,9 @@ export default function Home() {
           setIsConfirmModalOpen(false);
           setConfirmDeleteId(null);
         }
+        if (isClearHistoryModalOpen) {
+          setIsClearHistoryModalOpen(false);
+        }
         if (isSettingsOpen) {
           setIsSettingsOpen(false);
         }
@@ -101,7 +106,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isConfirmModalOpen, isSettingsOpen]);
+  }, [isConfirmModalOpen, isSettingsOpen, isClearHistoryModalOpen]);
   
 
   // keep raw headers synced
@@ -431,7 +436,7 @@ export default function Home() {
                     placeholder="Enter API URL"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 font-mono"
                   />
                   <div className="w-48">
                     <select
@@ -441,7 +446,7 @@ export default function Home() {
                         setSelectedHeaderPreset(key || null);
                         if (key && headerPresets[key]) setHeaders(headerPresets[key]);
                       }}
-                      className="w-full rounded border px-2 py-1 bg-transparent"
+                      className="w-full rounded px-3 py-2 text-sm bg-gray-100 border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700"
                     >
                       <option value="">Header Preset</option>
                       {Object.keys(headerPresets).map((k) => (
@@ -680,7 +685,7 @@ export default function Home() {
                                             >
                                               {endpoint.method}
                                             </span>
-                                            <span className="ml-2 text-sm truncate">{endpoint.url}</span>
+                                            <span className="ml-2 text-sm truncate font-mono">{endpoint.url}</span>
                                 </div>
                               </button>
                             </div>
@@ -728,14 +733,21 @@ export default function Home() {
         </motion.div>
         </main>
         {/* Request History */}
-        {requestHistory.length > 0 && (
-          <motion.div className="container mx-auto p-4 max-w-6xl" variants={cardVariants} initial="hidden" animate="visible">
-            <Card className="mt-6 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-white/20">
-              <CardHeader>
+        <motion.div className="container mx-auto p-4 max-w-6xl" variants={cardVariants} initial="hidden" animate="visible">
+          <Card className="mt-6 backdrop-blur-lg bg-white/10 dark:bg-black/20 border-white/20">
+            <CardHeader className="flex items-center justify-between">
+              <div>
                 <CardTitle>Request History</CardTitle>
                 <CardDescription>Recent requests (click to load or run)</CardDescription>
-              </CardHeader>
-              <CardContent>
+              </div>
+                <div>
+                <Button size="sm" variant="destructive" onClick={() => setIsClearHistoryModalOpen(true)} disabled={requestHistory.length === 0}>Clear</Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+              {requestHistory.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">No recent requests</div>
+              ) : (
                 <div className={requestHistory.length > 5 ? "space-y-2 max-h-60 overflow-y-auto pr-2" : "space-y-2"}>
                   {requestHistory.map((h) => (
                     <div key={h.id} className="flex items-center justify-between p-2 border rounded">
@@ -743,7 +755,7 @@ export default function Home() {
                         <button className="text-left w-full" onClick={() => { setUrl(h.url); setMethod(h.method); setBody(h.body || ""); setHeaders(h.headers || {}); }}>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-mono">{h.method}</span>
-                            <span className="text-sm truncate">{h.url}</span>
+                            <span className="text-sm truncate font-mono">{h.url}</span>
                           </div>
                         </button>
                       </div>
@@ -754,10 +766,10 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Confirm Delete Modal */}
         {isConfirmModalOpen && (
@@ -768,6 +780,19 @@ export default function Home() {
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={handleCancelDelete}>Cancel</Button>
                 <Button variant="destructive" onClick={handleConfirmDelete}>Delete</Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Clear History Confirmation Modal */}
+        {isClearHistoryModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white dark:bg-neutral-900 rounded-lg p-6 w-full max-w-sm shadow-lg">
+              <h2 className="text-lg font-semibold mb-4 text-center">Clear request history?</h2>
+              <p className="mb-6 text-center">This will remove all recent requests. This action cannot be undone.</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsClearHistoryModalOpen(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={() => { setRequestHistory([]); setIsClearHistoryModalOpen(false); showNotification('Request history cleared'); }}>Clear</Button>
               </div>
             </div>
           </div>
